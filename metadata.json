@@ -1,0 +1,6 @@
+{
+  "name": "Novel Plotter",
+  "description": "完全オフラインで動作する、日本語対応の小説プロット作成支援ツール。登場人物や世界観、構成をまとめ、外部AI（Geminiなど）にそのままペーストできる最高精度のプロットプロンプトを出力します。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
