@@ -391,6 +391,7 @@ export default function App() {
                     {activeTab === 'export' && (
                       <PromptExporter 
                         project={activeProject} 
+                        onUpdateProject={handleUpdateActiveProject}
                       />
                     )}
                   </motion.div>

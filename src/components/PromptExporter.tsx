@@ -11,15 +11,17 @@ import {
   Sliders, 
   AlignLeft, 
   ListRestart,
-  Volume2
+  Volume2,
+  LayoutList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PromptExporterProps {
   project: Project;
+  onUpdateProject: (fields: Partial<Project>) => void;
 }
 
-export default function PromptExporter({ project }: PromptExporterProps) {
+export default function PromptExporter({ project, onUpdateProject }: PromptExporterProps) {
   const [promptMode, setPromptMode] = useState<PromptMode>('novel_full');
   const [selectedBeatId, setSelectedBeatId] = useState<string>(
     project.beats.length > 0 ? project.beats[0].id : ''
@@ -30,6 +32,60 @@ export default function PromptExporter({ project }: PromptExporterProps) {
   const [writingStyle, setWritingStyle] = useState<string>('entertainment'); // entertainment, heavy, deep_lyric, suspense
   const [aiPerspective, setAiPerspective] = useState<string>('third_person'); // third_person, first_person, restricted
   const [copied, setCopied] = useState<boolean>(false);
+
+  // States for interactive critique plan applicator
+  const [targetApplyKey, setTargetApplyKey] = useState<string>('logline');
+  const [improvementText, setImprovementText] = useState<string>('');
+  const [applySuccessMessage, setApplySuccessMessage] = useState<string>('');
+
+  const getCurrentAppliedContentValue = () => {
+    if (targetApplyKey === 'logline') {
+      return project.logline || '';
+    }
+    if (targetApplyKey === 'theme') {
+      return project.theme || '';
+    }
+    if (targetApplyKey.startsWith('beat-')) {
+      const beatId = targetApplyKey.replace('beat-', '');
+      const beat = project.beats.find(b => b.id === beatId);
+      return beat ? beat.description : '';
+    }
+    return '';
+  };
+
+  const handleLoadCurrentValue = () => {
+    setImprovementText(getCurrentAppliedContentValue());
+  };
+
+  const handleApplyImprovement = () => {
+    if (!improvementText.trim()) return;
+
+    if (targetApplyKey === 'logline') {
+      onUpdateProject({ logline: improvementText });
+      setApplySuccessMessage('作品全体のログライン（一言あらすじ）に改善案を反映しました！');
+    } else if (targetApplyKey === 'theme') {
+      onUpdateProject({ theme: improvementText });
+      setApplySuccessMessage('作品のコアテーマに改善案を反映しました！');
+    } else if (targetApplyKey.startsWith('beat-')) {
+      const beatId = targetApplyKey.replace('beat-', '');
+      const updatedBeats = project.beats.map(b => {
+        if (b.id === beatId) {
+          return { ...b, description: improvementText };
+        }
+        return b;
+      });
+      onUpdateProject({ beats: updatedBeats });
+      
+      const targetBeat = project.beats.find(b => b.id === beatId);
+      const beatIndex = project.beats.findIndex(b => b.id === beatId) + 1;
+      setApplySuccessMessage(`第${beatIndex}章「${targetBeat?.title || '無題'}」のあらすじに改善案を反映しました！`);
+    }
+
+    setImprovementText('');
+    setTimeout(() => {
+      setApplySuccessMessage('');
+    }, 4000);
+  };
 
   const styleOptions = [
     { value: 'entertainment', label: '王道エンタメ風', desc: 'テンポよく読みやすく、ライトノベルや漫画原作に向いた文体' },
@@ -503,6 +559,103 @@ ${directiveMarkdown}
                 </div>
               </>
             )}
+          </div>
+        </div>
+
+        {/* 3. AIアドバイス・改善案のリアルタイム適用エンジン */}
+        <div className="bg-[#141414] border border-stone-800 rounded-xl p-5 shadow-sm space-y-4 animate-in fade-in" id="ai-improvement-applier-card">
+          <h3 className="font-serif text-base font-bold text-stone-100 flex items-center gap-1.5 border-b border-stone-800 pb-2">
+            <LayoutList className="w-5 h-5 text-[#c5a059]" />
+            3. 批評・対話結果（改善案）の個別反映
+          </h3>
+          
+          <p className="text-[10px] text-stone-400 leading-relaxed">
+            AIチーフ編集者等へのツッコミ・批評で得られたアドバイスや修正文を以下に入力し、直接プロットの各所に上書き反映（適用）させることができます。
+          </p>
+
+          <div className="space-y-3" id="applier-controls">
+            {/* 反映対象選択 */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-stone-300 block">反映先の箇所を選択</label>
+              <select
+                value={targetApplyKey}
+                onChange={(e) => {
+                  setTargetApplyKey(e.target.value);
+                }}
+                className="w-full text-xs p-2 rounded border border-stone-800 bg-stone-900 text-stone-100"
+                id="select-apply-target"
+              >
+                <option value="logline">作品全体：ログライン（一言あらすじ）</option>
+                <option value="theme">作品全体：コアテーマ</option>
+                {project.beats.map((el, i) => (
+                  <option key={el.id} value={`beat-${el.id}`}>
+                    第{i+1}章あらすじ：{el.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 現在の内容プレビュー */}
+            <div className="bg-stone-950 p-2.5 rounded border border-stone-800/60" id="current-content-preview">
+              <span className="text-[9px] font-bold text-stone-500 block uppercase tracking-wider mb-1">現在の登録内容</span>
+              <p className="text-[10.5px] text-stone-300 whitespace-pre-wrap leading-relaxed max-h-[100px] overflow-y-auto italic">
+                {getCurrentAppliedContentValue() || '(未入力)'}
+              </p>
+            </div>
+
+            {/* 新しい内容 / 改善案入力 */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-stone-300 block">適用する改善内容（新しい文章）</label>
+                <button
+                  type="button"
+                  onClick={handleLoadCurrentValue}
+                  className="text-[9px] text-[#c5a059] hover:text-[#b48e48] underline cursor-pointer"
+                  title="現在の文章をコピーして編集しやすくします"
+                >
+                  現在の内容を取り込む
+                </button>
+              </div>
+              <textarea
+                value={improvementText}
+                onChange={(e) => setImprovementText(e.target.value)}
+                placeholder="AIが提案してくれた改善後の文章や、ブラッシュアップしたあらすじをここにペースト、または直接執筆してください..."
+                className="w-full h-28 text-xs p-2 rounded border border-stone-800 bg-stone-900 text-stone-100 outline-none focus:border-[#c5a059]"
+                id="textarea-improvement-text"
+              />
+            </div>
+
+            {/* 反映成功トースト / メッセージ */}
+            <AnimatePresence>
+              {applySuccessMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="bg-emerald-950/40 border border-emerald-800 text-emerald-300 p-2.5 rounded text-[11px] font-bold leading-normal flex items-start gap-1.5"
+                  id="apply-success-notification"
+                >
+                  <span className="text-emerald-400 mt-0.5 animate-bounce">✓</span>
+                  <span>{applySuccessMessage}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 反映実行ボタン */}
+            <button
+              type="button"
+              onClick={handleApplyImprovement}
+              disabled={!improvementText.trim()}
+              className={`w-full py-2 px-3 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                improvementText.trim()
+                  ? 'bg-[#c5a059] hover:bg-[#b48e48] text-black hover:shadow-md cursor-pointer'
+                  : 'bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-750'
+              }`}
+              id="btn-apply-improvement"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              選択した箇所に改善案を反映・上書きする
+            </button>
           </div>
         </div>
       </div>
