@@ -12,7 +12,9 @@ import {
   AlignLeft, 
   ListRestart,
   Volume2,
-  LayoutList
+  LayoutList,
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -33,58 +35,11 @@ export default function PromptExporter({ project, onUpdateProject }: PromptExpor
   const [aiPerspective, setAiPerspective] = useState<string>('third_person'); // third_person, first_person, restricted
   const [copied, setCopied] = useState<boolean>(false);
 
-  // States for interactive critique plan applicator
-  const [targetApplyKey, setTargetApplyKey] = useState<string>('logline');
-  const [improvementText, setImprovementText] = useState<string>('');
-  const [applySuccessMessage, setApplySuccessMessage] = useState<string>('');
-
-  const getCurrentAppliedContentValue = () => {
-    if (targetApplyKey === 'logline') {
-      return project.logline || '';
-    }
-    if (targetApplyKey === 'theme') {
-      return project.theme || '';
-    }
-    if (targetApplyKey.startsWith('beat-')) {
-      const beatId = targetApplyKey.replace('beat-', '');
-      const beat = project.beats.find(b => b.id === beatId);
-      return beat ? beat.description : '';
-    }
-    return '';
-  };
-
-  const handleLoadCurrentValue = () => {
-    setImprovementText(getCurrentAppliedContentValue());
-  };
-
-  const handleApplyImprovement = () => {
-    if (!improvementText.trim()) return;
-
-    if (targetApplyKey === 'logline') {
-      onUpdateProject({ logline: improvementText });
-      setApplySuccessMessage('作品全体のログライン（一言あらすじ）に改善案を反映しました！');
-    } else if (targetApplyKey === 'theme') {
-      onUpdateProject({ theme: improvementText });
-      setApplySuccessMessage('作品のコアテーマに改善案を反映しました！');
-    } else if (targetApplyKey.startsWith('beat-')) {
-      const beatId = targetApplyKey.replace('beat-', '');
-      const updatedBeats = project.beats.map(b => {
-        if (b.id === beatId) {
-          return { ...b, description: improvementText };
-        }
-        return b;
-      });
-      onUpdateProject({ beats: updatedBeats });
-      
-      const targetBeat = project.beats.find(b => b.id === beatId);
-      const beatIndex = project.beats.findIndex(b => b.id === beatId) + 1;
-      setApplySuccessMessage(`第${beatIndex}章「${targetBeat?.title || '無題'}」のあらすじに改善案を反映しました！`);
-    }
-
-    setImprovementText('');
-    setTimeout(() => {
-      setApplySuccessMessage('');
-    }, 4000);
+  // Helper for appending prompt critique recommendations
+  const handleAppendTemplate = (template: string) => {
+    const current = project.aiCritiqueInstructions || '';
+    const updated = current ? `${current}\n\n${template}` : template;
+    onUpdateProject({ aiCritiqueInstructions: updated });
   };
 
   const styleOptions = [
@@ -314,6 +269,18 @@ ${esc(project.logline)}
 `;
     }
 
+    let critiqueInstructionsMarkdown = '';
+    if (project.aiCritiqueInstructions?.trim()) {
+      critiqueInstructionsMarkdown = `
+# 前回までの批評・指摘ずみ懸念点＆改善指示（最優先・必須修正クリア要件）
+※以下は過去のAI批評および著者によってストックされた、物語がクリアすべき懸念点・修正・改善要求です。
+今回の執筆や構成の提案においては、以下の改善要素・課題が設定およびストーリー展開上で100%解決・クリアされるよう、絶対条件の最優先事項としてすべて反映・統合してください。
+--------------------------------------------------
+${project.aiCritiqueInstructions.trim()}
+--------------------------------------------------
+`;
+    }
+
     return `
 =========================================
 小説プロット連携・執筆支援統合プロンプト
@@ -326,7 +293,7 @@ ${charactersMarkdown}
 ${worldMarkdown}
 
 ${beatsMarkdown}
-
+${critiqueInstructionsMarkdown ? `\n${critiqueInstructionsMarkdown}\n` : ''}
 ${directiveMarkdown}
 `;
   }, [project, promptMode, selectedBeatId, selectedCharId, writingStyle, aiPerspective]);
@@ -562,100 +529,94 @@ ${directiveMarkdown}
           </div>
         </div>
 
-        {/* 3. AIアドバイス・改善案のリアルタイム適用エンジン */}
-        <div className="bg-[#141414] border border-stone-800 rounded-xl p-5 shadow-sm space-y-4 animate-in fade-in" id="ai-improvement-applier-card">
-          <h3 className="font-serif text-base font-bold text-stone-100 flex items-center gap-1.5 border-b border-stone-800 pb-2">
-            <LayoutList className="w-5 h-5 text-[#c5a059]" />
-            3. 批評・対話結果（改善案）の個別反映
-          </h3>
+        {/* 3. AI批評・ツッコミ・修正要望の追加メモ */}
+        <div className="bg-[#141414] border border-stone-800 rounded-xl p-5 shadow-sm space-y-4 animate-in fade-in" id="ai-critique-instructions-card">
+          <div className="flex items-center justify-between border-b border-stone-800 pb-2">
+            <h3 className="font-serif text-base font-bold text-stone-100 flex items-center gap-1.5">
+              <Construction className="w-5 h-5 text-[#c5a059]" />
+              3. AI批評から得た「指摘された懸念点・改善策」メモ
+            </h3>
+            {project.aiCritiqueInstructions?.trim() && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('メモした指摘履歴をすべてクリアしますか？')) {
+                    onUpdateProject({ aiCritiqueInstructions: '' });
+                  }
+                }}
+                className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
+                title="すべての修正要望・ツッコミメモを消去"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                クリア
+              </button>
+            )}
+          </div>
           
           <p className="text-[10px] text-stone-400 leading-relaxed">
-            AIチーフ編集者等へのツッコミ・批評で得られたアドバイスや修正文を以下に入力し、直接プロットの各所に上書き反映（適用）させることができます。
+            AIチーフ編集者等へのツッコミ・批評で得られた「矛盾点」「中だるみの懸念」「改善アイデア」をここにコピペ、または追記してください。
+            ここに蓄積されたフィードバックは、<strong>次回プロンプト出力時に【最優先修正必須事項】として自動的に差し込まれ</strong>、それ以降のAI執筆において矛盾が修正されます。
           </p>
 
-          <div className="space-y-3" id="applier-controls">
-            {/* 反映対象選択 */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-stone-300 block">反映先の箇所を選択</label>
-              <select
-                value={targetApplyKey}
-                onChange={(e) => {
-                  setTargetApplyKey(e.target.value);
-                }}
-                className="w-full text-xs p-2 rounded border border-stone-800 bg-stone-900 text-stone-100"
-                id="select-apply-target"
+          <div className="space-y-3" id="critique-memo-editor">
+            {/* クイックテンプーレート挿入 */}
+            <div className="flex flex-wrap gap-1.5" id="critique-memo-helpers">
+              <button
+                type="button"
+                onClick={() => handleAppendTemplate('■ [AI指摘の懸念・指摘点]\n・ \n\n■ [解決・修正方針]\n・ ')}
+                className="text-[9px] px-2 py-1 bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 rounded font-medium transition-all hover:border-[#c5a059]/30"
               >
-                <option value="logline">作品全体：ログライン（一言あらすじ）</option>
-                <option value="theme">作品全体：コアテーマ</option>
-                {project.beats.map((el, i) => (
-                  <option key={el.id} value={`beat-${el.id}`}>
-                    第{i+1}章あらすじ：{el.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 現在の内容プレビュー */}
-            <div className="bg-stone-950 p-2.5 rounded border border-stone-800/60" id="current-content-preview">
-              <span className="text-[9px] font-bold text-stone-500 block uppercase tracking-wider mb-1">現在の登録内容</span>
-              <p className="text-[10.5px] text-stone-300 whitespace-pre-wrap leading-relaxed max-h-[100px] overflow-y-auto italic">
-                {getCurrentAppliedContentValue() || '(未入力)'}
-              </p>
+                + 懸念＆解決策の型
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAppendTemplate('■ [キャラクター言動ルール・キャラブレの修正指示]\n・ 「」という発言や態度は避ける\n・ ')}
+                className="text-[9px] px-2 py-1 bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 rounded font-medium transition-all hover:border-[#c5a059]/30"
+              >
+                + キャラブレ防止の型
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAppendTemplate('■ [展開・ペース配分の指示]\n・ \n・ ')}
+                className="text-[9px] px-2 py-1 bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 rounded font-medium transition-all hover:border-[#c5a059]/30"
+              >
+                + ペース配分の型
+              </button>
             </div>
 
             {/* 新しい内容 / 改善案入力 */}
             <div className="space-y-1">
-              <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-stone-300 block">適用する改善内容（新しい文章）</label>
-                <button
-                  type="button"
-                  onClick={handleLoadCurrentValue}
-                  className="text-[9px] text-[#c5a059] hover:text-[#b48e48] underline cursor-pointer"
-                  title="現在の文章をコピーして編集しやすくします"
-                >
-                  現在の内容を取り込む
-                </button>
-              </div>
               <textarea
-                value={improvementText}
-                onChange={(e) => setImprovementText(e.target.value)}
-                placeholder="AIが提案してくれた改善後の文章や、ブラッシュアップしたあらすじをここにペースト、または直接執筆してください..."
-                className="w-full h-28 text-xs p-2 rounded border border-stone-800 bg-stone-900 text-stone-100 outline-none focus:border-[#c5a059]"
-                id="textarea-improvement-text"
+                value={project.aiCritiqueInstructions || ''}
+                onChange={(e) => onUpdateProject({ aiCritiqueInstructions: e.target.value })}
+                placeholder="AIが提案してくれた改善策や、矛盾のツッコミ内容（懸念点＋修正指示）をここにそのままコピペ、または自由に追記してください..."
+                className="w-full h-44 text-xs p-2.5 rounded border border-stone-800 bg-stone-900 text-stone-100 outline-none focus:border-[#c5a059] font-mono leading-relaxed"
+                id="textarea-critique-instructions"
               />
             </div>
 
-            {/* 反映成功トースト / メッセージ */}
-            <AnimatePresence>
-              {applySuccessMessage && (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="bg-emerald-950/40 border border-emerald-800 text-emerald-300 p-2.5 rounded text-[11px] font-bold leading-normal flex items-start gap-1.5"
-                  id="apply-success-notification"
-                >
-                  <span className="text-emerald-400 mt-0.5 animate-bounce">✓</span>
-                  <span>{applySuccessMessage}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* 反映実行ボタン */}
-            <button
-              type="button"
-              onClick={handleApplyImprovement}
-              disabled={!improvementText.trim()}
-              className={`w-full py-2 px-3 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-                improvementText.trim()
-                  ? 'bg-[#c5a059] hover:bg-[#b48e48] text-black hover:shadow-md cursor-pointer'
-                  : 'bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-750'
-              }`}
-              id="btn-apply-improvement"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              選択した箇所に改善案を反映・上書きする
-            </button>
+            {/* 連動ステータス告知 */}
+            {project.aiCritiqueInstructions?.trim() ? (
+              <div 
+                className="p-2.5 rounded bg-[#2c4c38]/10 border border-[#2c4c38]/30 flex items-start gap-2 animate-pulse" 
+                id="critique-linker-status"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="text-[10px] text-emerald-300 leading-normal">
+                  現在、こちらの懸念点と解決方針は<strong>プロンプトに統合中</strong>です。右側で生成されるプロンプト末尾に「最優先・必須修正クリア要件」として自動連携されています。
+                </span>
+              </div>
+            ) : (
+              <div 
+                className="p-2.5 rounded bg-stone-950/40 border border-stone-800/60 flex items-start gap-2" 
+                id="critique-linker-status-empty"
+              >
+                <AlertCircle className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
+                <span className="text-[9.5px] text-stone-500 leading-normal">
+                  ツッコミ/改善案メモが未入力です（空欄の場合は追加プロンプト条件なし）。AI編集者から出てきた懸念や改善指示をコピペして、対話式のアップデートを体験しましょう。
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

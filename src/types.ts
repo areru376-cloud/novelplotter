@@ -53,6 +53,9 @@ export interface Project {
   publishSynopsis?: string;     // 各サービス用のあらすじ紹介文
   publishKeywords?: string[];   // 登録タグ (ざまぁ, 異世界転生, 悪役令嬢等)
   publishSchedule?: string;     // 投稿予定 (例: 毎週金曜20:00更新)
+  
+  // AIからのツッコミ・懸念点・改善指示のコピペ一覧（次回以降のプロンプト出力時に修正要素として自動的に付け加えられます）
+  aiCritiqueInstructions?: string;
 }
 
 export type PromptMode = 'novel_full' | 'critique' | 'dialogue_preview' | 'scene_expansion';
