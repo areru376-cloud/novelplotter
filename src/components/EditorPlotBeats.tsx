@@ -584,6 +584,19 @@ export default function EditorPlotBeats({ project, onUpdateProject }: EditorPlot
             );
           })}
         </AnimatePresence>
+
+        {project.beats.length > 0 && (
+          <div className="flex justify-center pt-2" id="beats-bottom-controls">
+            <button
+              onClick={handleAddField}
+              className="px-5 py-2.5 bg-[#c5a059] hover:bg-[#b48e48] text-black text-xs font-bold rounded-lg flex items-center gap-2 shadow-md transition-all cursor-pointer"
+              id="btn-add-beat-bottom"
+            >
+              <Plus className="w-4 h-4 text-black" />
+              新しい章の追加 (末尾)
+            </button>
+          </div>
+        )}
       </div>
 
       {project.beats.length === 0 && (

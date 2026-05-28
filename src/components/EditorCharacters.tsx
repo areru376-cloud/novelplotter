@@ -177,6 +177,17 @@ export default function EditorCharacters({ project, onUpdateProject }: EditorCha
                 </div>
               );
             })}
+
+            {project.characters.length > 0 && (
+              <button
+                onClick={handleAddCharacter}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-stone-900 hover:bg-stone-850 border border-dashed border-stone-800 hover:border-[#c5a059]/40 text-[#c5a059] hover:text-[#b48e48] rounded-lg text-xs font-bold transition-all mt-3 cursor-pointer shadow-xs"
+                id="btn-add-character-bottom"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#c5a059]" />
+                新しいキャラの追加 (末尾)
+              </button>
+            )}
           </div>
         )}
       </div>
