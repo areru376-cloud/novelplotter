@@ -53,7 +53,19 @@ export default function ProjectList({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `novel-plotter-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `novel-plotter-all-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportSingle = (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const dataStr = JSON.stringify(project, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${project.title || '無題のプロット'}-backup-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -177,7 +189,15 @@ export default function ProjectList({
                   </div>
 
                   {/* Quick actions shown on hover or when active */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-0 focus-within:opacity-100 transition-opacity ml-2">
+                  <div className={`flex items-center gap-1 transition-opacity ml-2 shrink-0 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+                    <button
+                      title="この小説をバックアップ保存"
+                      onClick={(e) => handleExportSingle(project, e)}
+                      className="p-1 rounded text-stone-500 hover:text-[#c5a059] hover:bg-stone-800 transition-colors"
+                      id={`btn-export-single-${project.id}`}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       title="複製する"
                       onClick={(e) => {
@@ -274,14 +294,32 @@ export default function ProjectList({
         </div>
 
         {projects.length > 0 && (
-          <button
-            onClick={handleExportAll}
-            className="w-full mt-2 py-1.5 px-3 border border-stone-800 hover:border-[#c5a059] text-stone-300 hover:text-[#c5a059] rounded text-xs font-medium transition-colors bg-stone-900 hover:bg-stone-850 flex items-center justify-center gap-1.5 shadow-sm"
-            id="btn-export-all"
-          >
-            <Download className="w-3.5 h-3.5 text-[#c5a059]" />
-            全あらすじをバックアップ出力
-          </button>
+          <div className="flex flex-col gap-1.5 mt-2">
+            {activeProjectId && (() => {
+              const activeProj = projects.find(p => p.id === activeProjectId);
+              if (!activeProj) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => handleExportSingle(activeProj, e)}
+                  className="w-full py-1.5 px-3 border border-stone-800 hover:border-[#c5a059] text-stone-200 hover:text-[#c5a059] rounded text-xs font-semibold transition-all bg-[#141414] hover:bg-stone-850 flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  id="btn-export-active"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#c5a059]" />
+                  「{activeProj.title || '無題'}」を単体で保存
+                </button>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={handleExportAll}
+              className="w-full py-1 px-3 border border-stone-850 hover:border-stone-700 text-stone-450 hover:text-stone-300 rounded text-[10.5px] font-medium transition-all bg-stone-950 hover:bg-stone-900 flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              id="btn-export-all"
+            >
+              <Download className="w-3 h-3 text-stone-500" />
+              全小説を一括で保存する
+            </button>
+          </div>
         )}
       </div>
     </div>
